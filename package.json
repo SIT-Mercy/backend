@@ -1,0 +1,23 @@
+{
+  "name": "mercy",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SIT-Mercy/backend.git"
+  },
+  "author": "SIT-Mercy",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/SIT-Mercy/backend/issues"
+  },
+  "homepage": "https://github.com/SIT-Mercy/backend#readme",
+  "dependencies": {
+    "@types/node": "^18.14.2",
+    "typescript": "^4.9.5"
+  }
+}
