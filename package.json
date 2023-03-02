@@ -19,6 +19,7 @@
   "dependencies": {
     "@types/node": "^18.14.2",
     "express": "^4.18.2",
+    "mercydb": "github:SIT-Mercy/database-mongodb",
     "typescript": "^4.9.5"
   },
   "devDependencies": {
