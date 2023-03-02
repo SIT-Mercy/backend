@@ -1,5 +1,8 @@
-import express from "express"
+import express, { type Request, type Response } from "express"
 
 const app = express()
 
-app.listen(80, "localhost")
+async function startServer() {
+  app.listen(80)
+}
+
