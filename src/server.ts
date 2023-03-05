@@ -9,6 +9,7 @@ export async function startServer(): Promise<void> {
     res.send("Hello world!")
     res.end()
   })
-  app.listen(6878)
-  console.log("Server running at http://localhost:6878")
+  app.listen(6878, () => {
+    console.log("Server running at http://localhost:6878")
+  })
 }
