@@ -39,6 +39,7 @@ module.exports = {
     "no-useless-return": "off",
     "no-empty": "warn",
     "@typescript-eslint/naming-convention": "off",
-    "@typescript-eslint/consistent-type-assertions": "off"
+    "@typescript-eslint/consistent-type-assertions": "off",
+    "no-multi-spaces": "off"
   }
 }

@@ -4,9 +4,19 @@ import express, { type Request, type Response } from "express"
 import { type Query } from "express-serve-static-core"
 import jwt from "jsonwebtoken"
 import { AuthError, StaffError, StaffPermission, type Student, StudentError, type Staff } from "mercy-shared"
-import { type Db, MongoClient, ObjectId } from "mongodb"
+import { type Db, MongoClient, ObjectId, type Int32 } from "mongodb"
+import { arraysEqualNoOrder } from "./util.js"
+const { TokenExpiredError } = jwt
 
 interface AuthedRequest extends Request {
+  staffSelf: Staff
+}
+
+interface WithStudent {
+  student: Student
+}
+
+interface WithStaff {
   staff: Staff
 }
 
@@ -42,8 +52,8 @@ async function startServer(ctx: ServerContext): Promise<void> {
   app.use(express.json())
 
   // validate each request with jwt
-  app.use(async (req: AuthedRequest, res, next) => {
-    // Skip "/login" itself
+  app.use("/op/*", async (req: AuthedRequest, res, next) => {
+    // Skip "/op/login" itself
     if (req.path === "/op/login") {
       next()
       return
@@ -51,11 +61,10 @@ async function startServer(ctx: ServerContext): Promise<void> {
     // Check if Authorization header is present
     const authHeader = req.headers.authorization
     if (!authHeader) {
-      res.status(401)
-      res.json({ error: AuthError.missingHeader })
-      return
+      return res.status(401).json({
+        error: AuthError.missingHeader
+      })
     }
-    console.log(authHeader)
     try {
       // Extract token from Authorization header
       const scheme = authHeader.split(" ")
@@ -69,155 +78,204 @@ async function startServer(ctx: ServerContext): Promise<void> {
       const studentId = payload.sub as string
       const staff = await staffs.findOne({ studentId })
       if (!staff) {
-        res.status(401)
-        res.json({ error: AuthError.staffNotFound })
-        return
+        return res.status(401).json({ error: StaffError.notFound })
       }
-      req.staff = staff as Staff
-      console.log(payload)
+      req.staffSelf = staff as Staff
       next()
     } catch (err) {
-      console.log(err)
-      // Return error if token is invalid
-      res.status(401)
-      res.json({ error: AuthError.invalidJwt })
+      if (err instanceof TokenExpiredError) {
+        return res.status(401).json({ error: AuthError.expiredJwt })
+      } else {
+        res.status(401).json({ error: AuthError.invalidJwt })
+      }
     }
   })
 
   function checkPermisionOf(requirements: StaffPermission[]) {
     return (req: AuthedRequest, res: Response, next) => {
-      if (requirements.every((it) => req.staff.permissions.includes(it))) {
+      if (requirements.every((it) => req.staffSelf.permissions.includes(it))) {
         next()
       } else {
-        res.status(403)
-        res.json({ error: AuthError.noPermission })
-        return
+        return res.status(403).json({
+          error: AuthError.noPermission
+        })
       }
     }
   }
 
-  async function findStudent(query: Query): Promise<Student | null | undefined> {
-    // for real StudentId
-    const studentId = query.studentId
-    // for mongoDB ObjectId
-    const student_id = query.student_id
-    if (!(studentId instanceof String || student_id instanceof String)) {
-      return
+  async function resolveStudent(req: Request & WithStudent, res: Response, next): Promise<any> {
+    const $ = req.body
+    const studentId = $.studentId as string
+    const _id = $._id as string
+    let found: Student
+    if (studentId) {
+      found = await students.findOne({ studentId }) as Student
+    } else if (_id) {
+      found = await students.findOne({ _id: new ObjectId(_id) }) as Student
+    } else {
+      return res.status(400).json({ error: StudentError.notFound })
     }
-    const student = studentId
-      ? await students.findOne({ studentId })
-      : await students.findOne({ _id: new ObjectId(student_id as string) })
-    return student as Student | null
+    if (found) {
+      req.student = found
+      next()
+    } else {
+      return res.status(404).json({ error: StudentError.notFound })
+    }
   }
 
-  async function findStaff(query: Query): Promise<Staff | null | undefined> {
-    // for real StudentId
-    const studentId = query.studentId
-    // for mongoDB ObjectId
-    const staff_id = query.staff_id
-    if (!(studentId instanceof String || staff_id instanceof String)) {
-      return
+  async function resolveStaff(req: Request & WithStaff, res: Response, next): Promise<any> {
+    const $ = req.body
+    const studentId = $.studentId as string
+    const _id = $._id as string
+    let found: Staff
+    if (studentId) {
+      found = await staffs.findOne({ studentId }) as Staff
+    } else if (_id) {
+      found = await staffs.findOne({ _id: new ObjectId(_id) }) as Staff
+    } else {
+      return res.status(400).json({ error: StaffError.invalidQuery })
     }
-    const staff = studentId
-      ? await staffs.findOne({ studentId })
-      : await staffs.findOne({ _id: new ObjectId(staff_id as string) })
-    return staff as Staff | null
+    if (found) {
+      req.staff = found
+      next()
+    } else {
+      return res.status(404).json({ error: StaffError.notFound })
+    }
   }
 
-  app.post("/op/updateStudentInfo", (req, res) => {
+  app.post("/op/addStudent",
+    checkPermisionOf([StaffPermission.alterStaffs]),
+    async (req: AuthedRequest, res) => {
+      const $ = req.body
+      const studentId = $.studentId as string | null
+      if (!studentId) {
+        return res.status(400).json({
+          error: StudentError.invalidQuery
+        })
+      }
+      if (await students.findOne({ studentId }) != null) {
+        return res.status(400).json({
+          error: StudentError.alreadyExists
+        })
+      }
+      const newStudent: Partial<Student> = {
+        studentId: $.studentId,
+        name: $.name,
+        college: $.college,
+        creationTime: new Date(),
+        version: 0
+      }
+      const result = await students.insertOne(newStudent)
+      return res.status(200).json({
+        ...newStudent,
+        _id: result.insertedId
+      })
+    })
 
-  })
+  app.post("/op/updateStudent",
+    checkPermisionOf([StaffPermission.alterStaffs]),
+    resolveStudent,
+    async (req: AuthedRequest & WithStudent, res) => {
+      const $ = req.body
+      const student = req.student
+      const update: Partial<Student> = {}
+      // TODO: validate data type
+      if ($.studentId && student.studentId !== $.studentId) update.studentId = $.studentId
+      if ($.name && student.name !== $.name) update.name = $.name
+      if ($.college && student.college !== $.college) update.college = $.college
+      if ($.phone && student.phone !== $.phone) update.phone = $.phone
+      if ($.poorLv && student.poorLv !== $.poorLv) update.poorLv = $.poorLv
+      if (Object.keys(update).length > 0) {
+        update.version = (student.version as number) + 1
+        const result = await students.updateOne({
+          _id: student._id
+        }, {
+          $set: update
+        })
+        console.log(result)
+      }
+      res.status(200).json({
+        _id: student._id,
+        ...update,
+      })
+    })
+
   /**
-   * Update or add a new staff.
+   * Add a new staff.
    */
-  app.put("/op/staffInfo",
+  app.post("/op/addStaff",
     checkPermisionOf([StaffPermission.alterStaffs]),
     async (req, res) => {
-      const staff = await findStaff(req.query)
       const $ = req.body
-      // if staff exists, then update it
-      if (staff) {
-        const update: Partial<Staff> = {}
-        // TODO: validate data type
-        if ($.studentId) update.studentId = $.studentId
-        if ($.password) update.password = $.password
-        if ($.permissions) update.permissions = $.permissions
-        if (Object.keys(update).length > 0) {
-          update.version = (staff.version as number) + 1
-          await staffs.updateOne({
-            _id: staff._id
-          }, {
-            $set: update
-          })
-        }
-        res.status(200)
-      } else {
-        // otherwise add it
-        if ($.studentId && $.password && $.permissions) {
-          await staffs.insertOne({
-            studentId: $.studentId,
-            password: $.password,
-            permissions: $.permissions,
-            creationTime: new Date(),
-            version: 0
-          } as Partial<Staff>)
-          res.status(200)
-        } else {
-          res.status(400)
-          res.json({ error: StaffError.invalidStaffInfo })
-        }
+      const studentId = $.studentId as string | null
+      if (!studentId) {
+        return res.status(400).json({
+          error: StaffError.invalidQuery
+        })
       }
+      if (await staffs.findOne({ studentId }) != null) {
+        return res.status(400).json({
+          error: StaffError.alreadyExists
+        })
+      }
+      // find its related student
+      const student = await students.findOne({ studentId })
+      if (!student) {
+        return res.status(400).send({
+          error: StudentError.notFound
+        })
+      }
+      const newStaff: Partial<Staff> = {
+        studentId,
+        student_id: student._id,
+        password: $.password ?? "",
+        permissions: $.permissions ?? [],
+        creationTime: new Date(),
+        version: 0
+      }
+      const result = await staffs.insertOne(newStaff)
+      res.status(200).json({
+        ...newStaff,
+        _id: result.insertedId
+      })
     })
 
-  app.put("/op/studentInfo",
-    checkPermisionOf([StaffPermission.alterStudentInfo]),
-    async (req, res) => {
-      const student = await findStudent(req.query)
+  /**
+   * Update a staff.
+   */
+  app.post("/op/updateStaff",
+    checkPermisionOf([StaffPermission.alterStaffs]),
+    resolveStaff,
+    async (req: AuthedRequest & WithStaff, res) => {
       const $ = req.body
-      if (student) {
-        const update: Partial<Student> = {}
-        // TODO: validate data type
-        if ($.studentId) update.studentId = $.studentId
-        if ($.name) update.name = $.name
-        if ($.college) update.college = $.college
-        if ($.phone) update.phone = $.phone
-        if ($.poorLv) update.poorLv = $.poorLv
-        if (Object.keys(update).length > 0) {
-          update.version = (student.version as number) + 1
-          await staffs.updateOne({
-            _id: student._id
-          }, {
-            $set: update
-          })
-        }
-        res.status(200)
-      } else {
-        if ($.studentId && $.name) {
-          await students.insertOne({
-            studentId: $.studentId,
-            name: $.name,
-            college: $.college,
-            creationTime: new Date(),
-            version: 0
-          } as Partial<Student>)
-          res.status(200)
-        } else {
-          res.status(400)
-          res.json({ error: StudentError.invalidStudentInfo })
-        }
+      const staff = req.staff
+
+      const update: Partial<Staff> = {}
+      // TODO: validate data type
+      if ($.studentId && staff.studentId !== $.studentId) update.studentId = $.studentId
+      if ($.password && staff.password !== $.password) update.password = $.password
+      if ($.permissions && arraysEqualNoOrder(staff.permissions, $.permissions)) update.permissions = $.permissions
+      if (Object.keys(update).length > 0) {
+        update.version = (staff.version as number) + 1
+        await staffs.updateOne({
+          _id: staff._id
+        }, {
+          $set: update
+        })
       }
+      res.status(200).json({
+        _id: staff._id,
+        ...update
+      })
     })
 
-  app.get("/op/studentInfo", async (req, res) => {
-    const student = await findStudent(req.query)
-    if (!student) {
-      res.status(404)
-      res.json({ error: StudentError.studentNotFound })
-      return
-    }
-    res.json(student)
-  })
-  
+  app.get("/op/studentInfo",
+    resolveStudent,
+    async (req: AuthedRequest & WithStudent, res) => {
+      const student = req.student
+      res.json(student)
+    })
+
   /**
    * For students checking their info.
    * It only requires name and student ID, so don't return security info.
@@ -225,18 +283,19 @@ async function startServer(ctx: ServerContext): Promise<void> {
   app.get("/studentInfo", async (req, res) => {
     const name = req.query.name
     const studentId = req.query.studentId
-    if (!(studentId instanceof String && name instanceof String)) {
-      res.status(400)
-      res.json({ error: StudentError.invalidStudentQuery })
-      return
+    if (typeof studentId !== "string" && typeof name !== "string") {
+      return res.status(400).json({ error: StudentError.invalidQuery })
     }
-    const student = await students.findOne({ studentId, name })
+    const student = await students.findOne({ studentId, name }) as Student | null
     if (!student) {
-      res.status(404)
-      res.json({ error: StudentError.studentNotFound })
-      return
+      return res.status(404).json({ error: StudentError.notFound })
     }
-    res.json(student)
+    res.json({
+      studentId: student.studentId,
+      name: student.name,
+      point: student.point,
+      college: student.college,
+    } as Partial<Student>)
   })
 
   app.get("/", (req, res) => {
@@ -251,25 +310,23 @@ async function startServer(ctx: ServerContext): Promise<void> {
     const staff = await staffs.findOne({ studentId })
     if (!staff) {
       res.status(401)
-      res.json({ error: AuthError.staffNotFound })
+      res.json({ error: StaffError.notFound })
       return
     }
     if (staff.password !== password) {
       res.status(401)
-      res.json({ error: AuthError.wrongStudentIdOrPassword })
+      res.json({ error: AuthError.wrongCredentials })
       return
     }
-    console.log(staff.studentId)
     // Create JWT token
     const token = jwt.sign({ sub: staff.studentId }, ctx.jwtSecret, {
       expiresIn: "2h"
     })
-    console.log(token)
     // Send token in response
     res.json({ token })
   })
 
-  app.listen(12878, () => {
-    console.log("Server running at http://localhost:12878")
+  app.listen(2468, () => {
+    console.log("Server running at http://localhost:2468")
   })
 }
