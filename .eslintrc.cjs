@@ -37,6 +37,7 @@ module.exports = {
     "@typescript-eslint/no-this-alias": "off",
     "no-trailing-spaces": "off",
     "no-useless-return": "off",
-    "no-empty": "warn"
+    "no-empty": "warn",
+    "@typescript-eslint/naming-convention": "off",
   }
 }

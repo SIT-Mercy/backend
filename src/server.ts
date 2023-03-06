@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
+import assert from "assert"
 import express, { type Request, type Response } from "express"
 import jwt from "jsonwebtoken"
-import { AuthError, StaffPermission, type Staff } from "mercy-shared"
+import { AuthError, StaffPermission, StudentError, type Staff } from "mercy-shared"
 import { type Db, MongoClient, ObjectId } from "mongodb"
 
 interface AuthedRequest extends Request {
@@ -34,6 +35,7 @@ async function startServer(ctx: ServerContext): Promise<void> {
   const app = express()
 
   const staffs = ctx.db.collection("staffs")
+  const students = ctx.db.collection("students")
 
   // Convert the "req.body" to json
   app.use(express.json())
@@ -70,7 +72,7 @@ async function startServer(ctx: ServerContext): Promise<void> {
         res.json({ error: AuthError.staffNotFound })
         return
       }
-      req.staff = staff
+      req.staff = staff as Staff
       console.log(payload)
       next()
     } catch (err) {
@@ -113,8 +115,8 @@ async function startServer(ctx: ServerContext): Promise<void> {
       res.json({ error: StudentError.studentIdNotGiven })
       return
     }
-    const student = studentId ?
-      await students.findOne({ studentId })
+    const student = studentId
+      ? await students.findOne({ studentId })
       : students.findOne({ student_id: new ObjectId(student_id as string) })
     if (!student) {
       res.status(404)
