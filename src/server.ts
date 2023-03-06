@@ -1,6 +1,7 @@
 import express, { type Request, type Response } from "express"
 import jwt from "jsonwebtoken"
 import { AuthError, StaffPermission, type Staff } from "mercy-shared"
+import { ObjectId } from "mongodb"
 const testUsers = [
   { id: 1, username: "user1", password: "password1" },
   { id: 2, username: "user2", password: "password2" },
@@ -15,9 +16,9 @@ export async function startServer(): Promise<void> {
   const app = express()
   app.use(express.json())
 
-  app.use((req: AuthenticatedRequest, res, next) => {
+  app.use("/op/*", (req: AuthenticatedRequest, res, next) => {
     // Skip "/login" itself
-    if (req.path === "/login") {
+    if (req.path === "/op/login") {
       next()
       return
     }
@@ -65,15 +66,28 @@ export async function startServer(): Promise<void> {
       }
     }
   }
-  app.use("/updateStaff", checkPermisionOf([StaffPermission.alterStaffs]))
-  app.post("/updateStaff", (req, res) => {
+  app.use("/op/updateStaff", checkPermisionOf([StaffPermission.alterStaffs]))
+  app.post("/op/updateStaff", (req, res) => {
 
   })
-  app.post("/updateStaffSelf", (req, res) => {
+  app.post("/op/updateStaffSelf", (req, res) => {
 
   })
-  app.get("/studentInfo", (req, res) => {
-
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises
+  app.get("/op/studentInfo", async (req, res) => {
+    // for real StudentId
+    const studentId = req.query.studentId
+    // for mongoDB ObjectId
+    const student_id = req.query.student_id
+    if (!(studentId instanceof String || student_id instanceof String)) {
+      res.status(400)
+      res.json({ error: StudentError.studentIdNotGiven })
+      return
+    }
+    const student = studentId?
+      await students.findOne({ studentId })
+      : students.findOne({ student_id: new ObjectId(student_id as string) })
+    res.json(student)
   })
   app.get("/", (req, res) => {
     res.status(200)
@@ -82,11 +96,11 @@ export async function startServer(): Promise<void> {
     res.end()
   })
 
-  app.post("/updateStaff", (req, res) => {
+  app.post("/op/updateStaff", (req, res) => {
 
   })
 
-  app.post("/login", (req, res) => {
+  app.post("/op/login", (req, res) => {
     const { username, password } = req.body
     const user = testUsers.find(
       user => user.username === username && user.password === password
