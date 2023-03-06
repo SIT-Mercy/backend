@@ -1,21 +1,45 @@
+import { assert } from "console"
 import express, { type Request, type Response } from "express"
 import jwt from "jsonwebtoken"
+import { type Db, MongoClient } from "mongodb"
 import { AuthError } from "mercy-shared"
-const testUsers = [
-  { id: 1, username: "user1", password: "password1" },
-  { id: 2, username: "user2", password: "password2" },
-]
 
-interface AuthenticatedRequest extends Request {
+interface AuthedRequest extends Request {
   studentId?: string
 }
 
-export async function startServer(): Promise<void> {
-  const secret = "mysecretkey"
+interface ServerContext {
+  db: Db
+  jwtSecret: string
+}
+
+export async function start(): Promise<void> {
+  // TODO: generate a random secret when lanuching
+  const jwtSecret = "mysecretkey"
+  const uri = "mongodb://localhost:27017"
+  const client = new MongoClient(uri)
+  try {
+    const db = client.db("sit_mercy")
+    await startServer({
+      db,
+      jwtSecret
+    })
+  } catch (e) {
+    client.close()
+    console.log(e)
+  }
+}
+
+async function startServer(ctx: ServerContext): Promise<void> {
   const app = express()
+
+  const staffs = ctx.db.collection("staffs")
+
+  // Convert the "req.body" to json
   app.use(express.json())
 
-  app.use((req: AuthenticatedRequest, res, next) => {
+  // validate each request with jwt
+  app.use((req: AuthedRequest, res, next) => {
     // Skip "/login" itself
     if (req.path === "/login") {
       next()
@@ -28,19 +52,22 @@ export async function startServer(): Promise<void> {
       res.json({ error: AuthError.missingHeader })
       return
     }
-
+    console.log(authHeader)
     try {
       // Extract token from Authorization header
-      const token = authHeader.split(" ")[1]
+      const scheme = authHeader.split(" ")
+      // Use Bearer authentication scheme
+      assert(scheme[0] === "Bearer")
+      const token = scheme[1]
       // Verify token and decode payload
-      const payload = jwt.verify(token, secret)
+      const payload = jwt.verify(token, ctx.jwtSecret)
 
       // Attach payload to request object for later use
       req.studentId = payload.sub as string
       console.log(payload)
-      // Call next middleware
       next()
     } catch (err) {
+      console.log(err)
       // Return error if token is invalid
       res.status(401)
       res.json({ error: AuthError.invalidJwt })
@@ -53,23 +80,31 @@ export async function startServer(): Promise<void> {
     res.send("Hello world!")
     res.end()
   })
-  app.post("/register", (req, res) => {
+
+  app.post("/addUser", (req: AuthedRequest, res) => {
 
   })
 
-  app.post("/login", (req, res) => {
-    const { username, password } = req.body
-    const user = testUsers.find(
-      user => user.username === username && user.password === password
-    )
-    if (!user) {
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises
+  app.post("/login", async (req, res) => {
+    const { studentId, password } = req.body
+    const staff = await staffs.findOne({ studentId })
+    if (!staff) {
+      res.status(401)
+      res.json({ error: AuthError.staffNotFound })
+      return
+    }
+    if (staff.password !== password) {
       res.status(401)
       res.json({ error: AuthError.wrongStudentIdOrPassword })
       return
     }
+    console.log(staff.studentId)
     // Create JWT token
-    const token = jwt.sign({ sub: user.id }, secret)
-
+    const token = jwt.sign({ sub: staff.studentId }, ctx.jwtSecret, {
+      expiresIn: "2h"
+    })
+    console.log(token)
     // Send token in response
     res.json({ token })
   })

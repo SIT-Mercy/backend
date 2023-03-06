@@ -1,6 +1,6 @@
 import { install as installSourceMap } from "source-map-support"
-import { startServer } from "./server.js"
+import { start } from "./server.js"
 
 installSourceMap()
 
-await startServer()
+await start()

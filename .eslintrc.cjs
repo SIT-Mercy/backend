@@ -36,6 +36,7 @@ module.exports = {
     "@typescript-eslint/strict-boolean-expressions": "off",
     "@typescript-eslint/no-this-alias": "off",
     "no-trailing-spaces": "off",
-    "no-useless-return": "off"
+    "no-useless-return": "off",
+    "no-empty": "warn"
   }
 }
