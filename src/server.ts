@@ -1,13 +1,13 @@
 import express, { type Request, type Response } from "express"
 import jwt from "jsonwebtoken"
-import { AuthError } from "mercy-shared"
+import { AuthError, StaffPermission, type Staff } from "mercy-shared"
 const testUsers = [
   { id: 1, username: "user1", password: "password1" },
   { id: 2, username: "user2", password: "password2" },
 ]
 
 interface AuthenticatedRequest extends Request {
-  studentId?: string
+  staff: Staff
 }
 
 export async function startServer(): Promise<void> {
@@ -36,7 +36,14 @@ export async function startServer(): Promise<void> {
       const payload = jwt.verify(token, secret)
 
       // Attach payload to request object for later use
-      req.studentId = payload.sub as string
+      const studentId = payload.sub as string
+      const staff = await staffs.findOne({ studentId })
+      if (!staff) {
+        res.status(401)
+        res.json({ error: AuthError.staffNotFound })
+        return
+      }
+      req.staff = staff
       console.log(payload)
       // Call next middleware
       next()
@@ -47,13 +54,35 @@ export async function startServer(): Promise<void> {
     }
   })
 
+  function checkPermisionOf(requirements: StaffPermission[]) {
+    return (req: AuthenticatedRequest, res: Response, next) => {
+      if (requirements.every((it) => req.staff.permissions.includes(it))) {
+        next()
+      } else {
+        res.status(403)
+        res.json({ error: AuthError.noPermission })
+        return
+      }
+    }
+  }
+  app.use("/updateStaff", checkPermisionOf([StaffPermission.alterStaffs]))
+  app.post("/updateStaff", (req, res) => {
+
+  })
+  app.post("/updateStaffSelf", (req, res) => {
+
+  })
+  app.get("/studentInfo", (req, res) => {
+
+  })
   app.get("/", (req, res) => {
     res.status(200)
     res.contentType("text/plain")
     res.send("Hello world!")
     res.end()
   })
-  app.post("/register", (req, res) => {
+
+  app.post("/updateStaff", (req, res) => {
 
   })
 
@@ -70,6 +99,7 @@ export async function startServer(): Promise<void> {
     // Create JWT token
     const token = jwt.sign({ sub: user.id }, secret)
 
+    res.status(200)
     // Send token in response
     res.json({ token })
   })
