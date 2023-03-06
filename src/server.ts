@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-misused-promises */
 import express, { type Request, type Response } from "express"
 import jwt from "jsonwebtoken"
 import { AuthError, StaffPermission, type Staff } from "mercy-shared"
@@ -67,13 +68,16 @@ export async function startServer(): Promise<void> {
     }
   }
   app.use("/op/updateStaff", checkPermisionOf([StaffPermission.alterStaffs]))
+  app.use("/op/updateStudentInfo", checkPermisionOf([StaffPermission.alterStudentInfo]))
+  app.post("/op/updateStudentInfo", (req, res) => {
+
+  })
   app.post("/op/updateStaff", (req, res) => {
 
   })
-  app.post("/op/updateStaffSelf", (req, res) => {
+  app.post("/op/updateSelf", (req, res) => {
 
   })
-  // eslint-disable-next-line @typescript-eslint/no-misused-promises
   app.get("/op/studentInfo", async (req, res) => {
     // for real StudentId
     const studentId = req.query.studentId
@@ -84,9 +88,30 @@ export async function startServer(): Promise<void> {
       res.json({ error: StudentError.studentIdNotGiven })
       return
     }
-    const student = studentId?
+    const student = studentId ?
       await students.findOne({ studentId })
       : students.findOne({ student_id: new ObjectId(student_id as string) })
+    if (!student) {
+      res.status(404)
+      res.json({ error: StudentError.noSuchStudent })
+      return
+    }
+    res.json(student)
+  })
+  app.get("/myStudentInfo", async (req, res) => {
+    const name = req.query.name
+    const studentId = req.query.studentId
+    if (!(studentId instanceof String && name instanceof String)) {
+      res.status(400)
+      res.json({ error: StudentError.studentIdNotGiven })
+      return
+    }
+    const student = await students.findOne({ studentId, name })
+    if (!student) {
+      res.status(404)
+      res.json({ error: StudentError.noSuchStudent })
+      return
+    }
     res.json(student)
   })
   app.get("/", (req, res) => {
