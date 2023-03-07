@@ -54,7 +54,7 @@ async function startServer(ctx: ServerContext): Promise<void> {
   // validate each request with jwt
   app.use("/op/*", async (req: AuthedRequest, res, next) => {
     // Skip "/op/login" itself
-    if (req.path === "/op/login") {
+    if (req.baseUrl === "/op/login") {
       next()
       return
     }
@@ -105,8 +105,8 @@ async function startServer(ctx: ServerContext): Promise<void> {
 
   async function resolveStudent(req: Request & WithStudent, res: Response, next): Promise<any> {
     const $ = req.body
-    const studentId = $.studentId as string
-    const _id = $._id as string
+    const studentId = ($.studentId || req.query.studentId) as string
+    const _id = ($._id || req.query.id) as string
     let found: Student
     if (studentId) {
       found = await students.findOne({ studentId }) as Student
@@ -254,7 +254,7 @@ async function startServer(ctx: ServerContext): Promise<void> {
       // TODO: validate data type
       if ($.studentId && staff.studentId !== $.studentId) update.studentId = $.studentId
       if ($.password && staff.password !== $.password) update.password = $.password
-      if ($.permissions && arraysEqualNoOrder(staff.permissions, $.permissions)) update.permissions = $.permissions
+      if ($.permissions && !arraysEqualNoOrder(staff.permissions, $.permissions)) update.permissions = $.permissions
       if (Object.keys(update).length > 0) {
         update.version = (staff.version as number) + 1
         await staffs.updateOne({
@@ -269,18 +269,32 @@ async function startServer(ctx: ServerContext): Promise<void> {
       })
     })
 
-  app.get("/op/studentInfo",
+  app.get("/op/staff",
+    resolveStaff,
+    async (req: AuthedRequest & WithStaff, res) => {
+      const staff = req.staff
+      res.status(200).json({
+        student_id: staff.student_id,
+        _id: staff._id,
+        permissions: staff.permissions,
+        creationTime: staff.creationTime,
+        version: staff.version,
+        active: staff.active,
+      } as Partial<Staff>)
+    })
+
+  app.get("/op/student",
     resolveStudent,
     async (req: AuthedRequest & WithStudent, res) => {
       const student = req.student
-      res.json(student)
+      res.status(200).json(student)
     })
 
   /**
    * For students checking their info.
    * It only requires name and student ID, so don't return security info.
    */
-  app.get("/studentInfo", async (req, res) => {
+  app.get("/student", async (req, res) => {
     const name = req.query.name
     const studentId = req.query.studentId
     if (typeof studentId !== "string" && typeof name !== "string") {
@@ -305,7 +319,7 @@ async function startServer(ctx: ServerContext): Promise<void> {
     res.end()
   })
 
-  app.post("/login", async (req, res) => {
+  app.post("/op/login", async (req, res) => {
     const { studentId, password } = req.body
     const staff = await staffs.findOne({ studentId })
     if (!staff) {
