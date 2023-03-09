@@ -12,22 +12,27 @@ import { init as initItemService } from "./service/item.js"
 import { init as initStaffService } from "./service/staff.js"
 import { init as initStudentService } from "./service/student.js"
 const { TokenExpiredError } = jwt
-
+interface ServerOptions {
+  dbUri: string
+  dbName: string
+  port: number
+}
 interface ServerContext {
   db: Db
   jwtSecret: string
+  port: number
 }
 
-export async function start(): Promise<void> {
+export async function start(options: ServerOptions): Promise<void> {
   // TODO: generate a random secret when lanuching
   const jwtSecret = "mysecretkey"
-  const uri = "mongodb://localhost:27017"
-  const client = new MongoClient(uri)
+  const client = new MongoClient(options.dbUri)
   try {
-    const db = client.db("sit_mercy")
+    const db = client.db(options.dbName)
     await startServer({
       db,
-      jwtSecret
+      jwtSecret,
+      port: options.port
     })
   } catch (e) {
     client.close()
@@ -91,11 +96,13 @@ async function startServer(ctx: ServerContext): Promise<void> {
   } = buildMiddleware({
     staffs, students, items
   })
+
   initStudentService(app, {
     checkPermisionOf,
     resolveStudent,
     students,
   })
+
   initStaffService(app, {
     checkPermisionOf,
     resolveStaff,
@@ -138,7 +145,7 @@ async function startServer(ctx: ServerContext): Promise<void> {
       res.json({ token })
     })
 
-  app.listen(2468, () => {
-    console.log("Server running at http://localhost:2468")
+  app.listen(ctx.port, () => {
+    console.log(`Server running at http://localhost:${ctx.port}`)
   })
 }
