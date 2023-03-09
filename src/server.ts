@@ -11,6 +11,7 @@ import { build as buildMiddleware } from "./middleware.js"
 import { init as initItemService } from "./service/item.js"
 import { init as initStaffService } from "./service/staff.js"
 import { init as initStudentService } from "./service/student.js"
+import cors from "cors"
 const { TokenExpiredError } = jwt
 interface ServerOptions {
   dbUri: string
@@ -43,12 +44,14 @@ export async function start(options: ServerOptions): Promise<void> {
 async function startServer(ctx: ServerContext): Promise<void> {
   const app = express()
 
+  // Convert the "req.body" to json
+  app.use(express.json())
+  // Cross-origin requests sharing
+  app.use(cors())
+
   const staffs = ctx.db.collection("staffs")
   const students = ctx.db.collection("students")
   const items = ctx.db.collection("items")
-
-  // Convert the "req.body" to json
-  app.use(express.json())
 
   // validate each request with jwt
   app.use("/op/*", async (req: AuthedRequest, res, next) => {

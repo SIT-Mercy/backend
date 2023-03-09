@@ -77,6 +77,12 @@ export function init(
       res.status(200).json(item)
     })
 
+  app.get("/op/items",
+    async (req: AuthedRequest, res) => {
+      const all = await ctx.items.find({ active: true } as Partial<Item>).toArray()
+      return res.status(200).json(all)
+    })
+
   app.get("/item",
     ctx.resolveItem,
     (req: AuthedRequest & WithItem, res) => {
@@ -95,8 +101,8 @@ export function init(
     })
 
   app.get("/items",
-    (req: AuthedRequest, res) => {
-      const all = ctx.items.find({ active: true } as Partial<Item>).toArray()
+    async (req: AuthedRequest, res) => {
+      const all = await ctx.items.find({ active: true } as Partial<Item>).toArray()
       return res.status(200).json(all)
     })
 }
