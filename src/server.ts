@@ -92,6 +92,13 @@ async function startServer(ctx: ServerContext): Promise<void> {
       }
     }
   })
+  /**
+   * For JWT validation
+   */
+  app.post("/op/validate", (req, res) => {
+    res.status(200)
+    res.end()
+  })
 
   const {
     checkPermisionOf,
@@ -117,13 +124,6 @@ async function startServer(ctx: ServerContext): Promise<void> {
     checkPermisionOf,
     resolveItem,
     items,
-  })
-
-  app.get("/", (req, res) => {
-    res.status(200)
-    res.contentType("text/plain")
-    res.send("Hello world!")
-    res.end()
   })
 
   app.post("/op/login",
