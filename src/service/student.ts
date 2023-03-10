@@ -100,4 +100,9 @@ export function init(
         college: student.college,
       } as Partial<Student>)
     })
+    
+  app.get("/op/students",
+    async (req, res) => {
+
+    })
 }

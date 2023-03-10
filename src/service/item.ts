@@ -102,7 +102,11 @@ export function init(
 
   app.get("/items",
     async (req: AuthedRequest, res) => {
-      const all = await ctx.items.find({ active: true } as Partial<Item>).toArray()
+      const all = await ctx.items.find({ active: true } as Partial<Item>, {
+        projection: {
+          _id: 0, version: 0, active: 0,
+        }
+      }).toArray()
       return res.status(200).json(all)
     })
 }
