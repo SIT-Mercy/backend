@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import { type Express } from "express"
-import { StaffPermission, StaffError, StudentError, type Staff } from "mercy-shared"
+import { StaffPermission, StaffError, StudentError, type Staff, Student } from "mercy-shared"
 import { type AuthedRequest, type WithStaff } from "../type"
 import { type Collection, ObjectId } from "mongodb"
 import { arraysEqualNoOrder } from "../util.js"
@@ -89,9 +89,14 @@ export function init(
     ctx.resolveStaff,
     async (req: AuthedRequest & WithStaff, res) => {
       const staff = req.staff
+      const student = await ctx.students.findOne({ _id: staff.student_id }) as Student
+      // hide password field
       res.status(200).json({
-        student_id: staff.student_id,
+        studentId: staff.studentId,
+        name: student.name,
         _id: staff._id,
+        phone: student.phone,
+        student_id: staff.student_id,
         permissions: staff.permissions,
         creationTime: staff.creationTime,
         version: staff.version,
