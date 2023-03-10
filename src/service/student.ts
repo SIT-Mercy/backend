@@ -100,9 +100,12 @@ export function init(
         college: student.college,
       } as Partial<Student>)
     })
-    
+  /**
+   * Get all students
+   */
   app.get("/op/students",
     async (req, res) => {
-
+      const all = await ctx.students.find({}).toArray()
+      return res.status(200).json(all)
     })
 }
