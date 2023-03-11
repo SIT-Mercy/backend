@@ -132,7 +132,7 @@ async function startServer(ctx: ServerContext): Promise<void> {
   })
 
   await initSheetService(app, {
-    sheetLoaderDir: path.resolve(ctx.dataDir, "sheet-loaders")
+    sheetLoaderDir: path.resolve(ctx.dataDir, "sheet-loader")
   })
 
   app.post("/op/login",
