@@ -12,16 +12,21 @@ import { init as initItemService } from "./service/item.js"
 import { init as initStaffService } from "./service/staff.js"
 import { init as initStudentService } from "./service/student.js"
 import cors from "cors"
+import { init as initSheetService } from "./service/sheet.js"
+import path from "path"
 const { TokenExpiredError } = jwt
+
 interface ServerOptions {
   dbUri: string
   dbName: string
   port: number
+  dataDir: string
 }
 interface ServerContext {
   db: Db
   jwtSecret: string
   port: number
+  dataDir: string
 }
 
 export async function start(options: ServerOptions): Promise<void> {
@@ -33,7 +38,8 @@ export async function start(options: ServerOptions): Promise<void> {
     await startServer({
       db,
       jwtSecret,
-      port: options.port
+      port: options.port,
+      dataDir: options.dataDir,
     })
   } catch (e) {
     client.close()
@@ -96,8 +102,7 @@ async function startServer(ctx: ServerContext): Promise<void> {
    * For JWT validation
    */
   app.post("/op/validate", (req, res) => {
-    res.status(200)
-    res.end()
+    return res.status(200).end()
   })
 
   const {
@@ -126,6 +131,10 @@ async function startServer(ctx: ServerContext): Promise<void> {
     items,
   })
 
+  await initSheetService(app, {
+    sheetLoaderDir: path.resolve(ctx.dataDir, "sheet-loaders")
+  })
+
   app.post("/op/login",
     async (req, res) => {
       const { studentId, password } = req.body
@@ -145,7 +154,7 @@ async function startServer(ctx: ServerContext): Promise<void> {
         expiresIn: "2h"
       })
       // Send token in response
-      res.json({ token })
+      return res.json({ token })
     })
 
   app.listen(ctx.port, () => {
