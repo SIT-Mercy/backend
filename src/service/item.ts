@@ -5,8 +5,8 @@ import { type AuthedRequest, type WithItem } from "../type"
 import { type Collection, ObjectId } from "mongodb"
 
 interface ItemContext {
-  checkPermisionOf: any
-  resolveItem: any
+  checkPermisionOf: (arg: any) => RequestHandler
+  resolveItem: RequestHandler
   items: Collection
 }
 

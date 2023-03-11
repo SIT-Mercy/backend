@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
-import { type Express } from "express"
+import { type RequestHandler, type Express } from "express"
 import { StaffPermission, StaffError, StudentError, type Staff, type Student } from "mercy-shared"
 import { type AuthedRequest, type WithStaff } from "../type"
 import { type Collection, ObjectId } from "mongodb"
 import { arraysEqualNoOrder } from "../util.js"
 
 interface StaffContext {
-  checkPermisionOf: any
+  checkPermisionOf: (arg: any) => RequestHandler
   resolveStaff: any
   staffs: Collection
   students: Collection
