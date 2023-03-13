@@ -10,6 +10,6 @@ const rootDir = path.dirname(fileURLToPath(import.meta.url))
 await start({
   dbUri: "mongodb://localhost:27017",
   dbName: "sit_mercy",
-  port: 2468,
+  port: 24680,
   dataDir: rootDir,
 })

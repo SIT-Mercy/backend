@@ -105,7 +105,16 @@ export function init(
    */
   app.get("/op/students",
     async (req, res) => {
-      const all = await ctx.students.find({}).toArray()
-      return res.status(200).json(all)
+      const $ = req.body
+      let students: any
+      if ($.page && $.limit) {
+        // pagination
+        const skip = ($.page - 1) * $.limit
+        students = await ctx.students.find().skip(skip).limit($.limit).toArray()
+      } else {
+        // all
+        students = await ctx.students.find().toArray()
+      }
+      return res.status(200).json(students)
     })
 }
