@@ -3,7 +3,7 @@ import assert from "assert"
 import express, { type Request, type Response } from "express"
 import jwt from "jsonwebtoken"
 import {
-  AuthError, StaffError, type Staff
+  AuthError, StaffError, Student, type Staff
 } from "mercy-shared"
 import { type Db, MongoClient, ObjectId } from "mongodb"
 import { type AuthedRequest } from "./type.js"
@@ -138,7 +138,8 @@ async function startServer(ctx: ServerContext): Promise<void> {
   app.post("/op/login",
     async (req, res) => {
       const { studentId, password } = req.body
-      const staff = await staffs.findOne({ studentId })
+      // only finding active staffs
+      const staff = await staffs.findOne({ studentId, active: true }) as Staff || null
       if (!staff) {
         res.status(401)
         res.json({ error: StaffError.notFound })
@@ -153,8 +154,16 @@ async function startServer(ctx: ServerContext): Promise<void> {
       const token = jwt.sign({ sub: staff.studentId }, ctx.jwtSecret, {
         expiresIn: "2h"
       })
-      // Send token in response
-      return res.json({ token })
+      const student = await students.findOne({ _id: staff.student_id }) as Student
+      // Send token in response and staff info
+      return res.json({
+        _id: staff._id,
+        student_id: student._id,
+        studentId: staff.studentId,
+        name: student.name,
+        permissions: staff.permissions,
+        jwt: token,
+      })
     })
 
   app.listen(ctx.port, () => {
