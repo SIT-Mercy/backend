@@ -117,4 +117,22 @@ export function init(
       }
       return res.status(200).json(students)
     })
+
+  app.get("/op/students/query",
+    async (req, res) => {
+      const $ = req.body
+      const prompt = $.prompt
+      if (prompt) {
+        const found = await ctx.students.find({
+          $or: [
+            { studentId: { $regex: prompt, $options: "i" } },
+            { name: { $regex: prompt, $options: "i" } }
+          ]
+        }).toArray()
+        return res.status(200).json(found)
+      } else {
+        return res.status(200).json([])
+      }
+    }
+  )
 }
