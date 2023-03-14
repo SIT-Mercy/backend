@@ -77,6 +77,15 @@ export function init(
       res.status(200).json(item)
     })
 
+  app.delete("/op/item/delete",
+    ctx.checkPermisionOf([StaffPermission.alterItems]),
+    ctx.resolveItem,
+    async (req: AuthedRequest & WithItem, res) => {
+      const item = req.item
+      await ctx.items.deleteOne({ _id: item._id })
+      res.status(200)
+    })
+    
   app.get("/op/items",
     async (req: AuthedRequest, res) => {
       const all = await ctx.items.find({ active: true } as Partial<Item>).toArray()

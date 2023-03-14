@@ -3,7 +3,7 @@ import assert from "assert"
 import express, { type Request, type Response } from "express"
 import jwt from "jsonwebtoken"
 import {
-  AuthError, StaffError, Student, type Staff
+  AuthError, StaffError, type Student, type Staff
 } from "mercy-shared"
 import { type Db, MongoClient, ObjectId } from "mongodb"
 import { type AuthedRequest } from "./type.js"

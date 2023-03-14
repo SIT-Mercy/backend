@@ -15,7 +15,7 @@ export function init(
   ctx: StudentContext
 ): void {
   app.post("/op/student/add",
-    ctx.checkPermisionOf([StaffPermission.alterStaffs]),
+    ctx.checkPermisionOf([StaffPermission.alterStudents]),
     async (req: AuthedRequest, res) => {
       const $ = req.body
       const studentId = $.studentId as string | null
@@ -44,7 +44,7 @@ export function init(
     })
 
   app.post("/op/student/update",
-    ctx.checkPermisionOf([StaffPermission.alterStaffs]),
+    ctx.checkPermisionOf([StaffPermission.alterStudents]),
     ctx.resolveStudent,
     async (req: AuthedRequest & WithStudent, res) => {
       const $ = req.body
